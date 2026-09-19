@@ -2,44 +2,42 @@ name: decode-screenshots
 on:
   push:
     paths:
-      - "b64/**"
       - ".github/workflows/decode-screenshots.yml"
   workflow_dispatch:
 jobs:
-  decode:
+  fetch:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Decode PNGs and commit
+      - name: Download PNGs and commit
         run: |
           set -euo pipefail
           mkdir -p screenshots
-          shopt -s nullglob
-          parts=(b64/*.part01)
-          if [ ${#parts[@]} -eq 0 ]; then
-            echo "No screenshot parts yet"
-            exit 0
-          fi
-          for part1 in "${parts[@]}"; do
-            base="$(basename "$part1" .part01)"
-            name="${base%.b64}"
-            cat "b64/${base}".part* | base64 -d > "screenshots/${name}"
-            python3 - <<PY
+          download() {
+            local url="$1" out="$2" sha="$3"
+            curl -fsSL -A "Mozilla/5.0" -o "$out" "$url"
+            python3 - "$out" "$sha" <<'PY'
+import hashlib, sys
 from pathlib import Path
-p = Path("screenshots/${name}")
+p = Path(sys.argv[1])
+expected = sys.argv[2]
 b = p.read_bytes()
-assert b.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{p} is not a PNG"
+assert b.startswith(b"\x89PNG\r\n\x1a\n"), f"{p} is not a PNG, got {b[:40]!r}"
+got = hashlib.sha256(b).hexdigest()
+assert got == expected, f"sha mismatch {got} != {expected}"
 print(p, "ok", len(b))
 PY
-          done
+          }
+          download "https://tmpfiles.org/dl/1789803101.b637d1b69cfd4e56/wzwmNlC7VBMn/homepage_platforms_desktop_1280_google.png" screenshots/homepage_platforms_desktop_1280_google.png 9cfa261697121f38a4e9d5e73cf195e886967a07e3a601f9b93fb3f1eb3481ee
+          download "https://tmpfiles.org/dl/1789803102.ec9808cb6bdcab7d/wbwcNECYVtLn/homepage_platforms_tablet_768_google.png" screenshots/homepage_platforms_tablet_768_google.png 4284168979426cc99a36c75f557a32c7427989b9b265db02a4ce38a2ae0d3dc8
+          download "https://tmpfiles.org/dl/1789803104.871654e7dfa5e41d/wmwqNUCDVxdo/homepage_platforms_phone_390_google.png" screenshots/homepage_platforms_phone_390_google.png bbb65b720c6c7d63f897b98459fccdb692f411ab54625b30eb6514b4cba7b946
+          download "https://tmpfiles.org/dl/1789803105.396b4869acb3fb98/wOw1NoCVVmoV/mcp_glass_pickers_desktop_1280.png" screenshots/mcp_glass_pickers_desktop_1280.png 5cd0fc3e4e22a1cddd498bbe8680efc8ad95b8b2f7488c744870901bd63c6167
+          download "https://tmpfiles.org/dl/1789803106.8087762994748c6c/wNwINgC5VXJs/mcp_glass_pickers_tablet_768.png" screenshots/mcp_glass_pickers_tablet_768.png af1893441017afe7ac8467d8f413e794af0b30860b794da0ca7cb22dd5b3b19d
+          download "https://tmpfiles.org/dl/1789803108.2db397e9675c9ac2/wsw4N9CiVhWK/mcp_glass_pickers_phone_390.png" screenshots/mcp_glass_pickers_phone_390.png 597c5b6189cd2b73522ece7cd11e412f878b60a7281a3bc65a57c72e0206a001
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add screenshots
-          if git diff --cached --quiet; then
-            echo "No screenshot changes"
-          else
-            git commit -m "Add decoded PR 1303 screenshots"
-            git push
-          fi
+          git commit -m "Add PR 1303 delivery screenshots"
+          git push
