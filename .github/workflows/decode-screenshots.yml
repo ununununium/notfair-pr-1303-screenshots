@@ -18,17 +18,7 @@ jobs:
           download() {
             local url="$1" out="$2" sha="$3"
             curl -fsSL -A "Mozilla/5.0" -o "$out" "$url"
-            python3 - "$out" "$sha" <<'PY'
-import hashlib, sys
-from pathlib import Path
-p = Path(sys.argv[1])
-expected = sys.argv[2]
-b = p.read_bytes()
-assert b.startswith(b"\x89PNG\r\n\x1a\n"), f"{p} is not a PNG, got {b[:40]!r}"
-got = hashlib.sha256(b).hexdigest()
-assert got == expected, f"sha mismatch {got} != {expected}"
-print(p, "ok", len(b))
-PY
+            python3 -c 'import hashlib,sys; from pathlib import Path; p=Path(sys.argv[1]); b=p.read_bytes(); assert b.startswith(b"\x89PNG\r\n\x1a\n"), repr(b[:40]); got=hashlib.sha256(b).hexdigest(); assert got==sys.argv[2], got; print(p, "ok", len(b))' "$out" "$sha"
           }
           download "https://tmpfiles.org/dl/1789803101.b637d1b69cfd4e56/wzwmNlC7VBMn/homepage_platforms_desktop_1280_google.png" screenshots/homepage_platforms_desktop_1280_google.png 9cfa261697121f38a4e9d5e73cf195e886967a07e3a601f9b93fb3f1eb3481ee
           download "https://tmpfiles.org/dl/1789803102.ec9808cb6bdcab7d/wbwcNECYVtLn/homepage_platforms_tablet_768_google.png" screenshots/homepage_platforms_tablet_768_google.png 4284168979426cc99a36c75f557a32c7427989b9b265db02a4ce38a2ae0d3dc8
