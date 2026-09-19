@@ -1,0 +1,45 @@
+name: decode-screenshots
+on:
+  push:
+    paths:
+      - "b64/**"
+      - ".github/workflows/decode-screenshots.yml"
+  workflow_dispatch:
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode PNGs and commit
+        run: |
+          set -euo pipefail
+          mkdir -p screenshots
+          shopt -s nullglob
+          parts=(b64/*.part01)
+          if [ ${#parts[@]} -eq 0 ]; then
+            echo "No screenshot parts yet"
+            exit 0
+          fi
+          for part1 in "${parts[@]}"; do
+            base="$(basename "$part1" .part01)"
+            name="${base%.b64}"
+            cat "b64/${base}".part* | base64 -d > "screenshots/${name}"
+            python3 - <<PY
+from pathlib import Path
+p = Path("screenshots/${name}")
+b = p.read_bytes()
+assert b.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{p} is not a PNG"
+print(p, "ok", len(b))
+PY
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add screenshots
+          if git diff --cached --quiet; then
+            echo "No screenshot changes"
+          else
+            git commit -m "Add decoded PR 1303 screenshots"
+            git push
+          fi
